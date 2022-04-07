@@ -155,6 +155,7 @@ static const MemMapEntry base_memmap[] = {
     [VIRT_PVTIME] =             { 0x090a0000, 0x00010000 },
     [VIRT_SECURE_GPIO] =        { 0x090b0000, 0x00001000 },
     [VIRT_MMIO] =               { 0x0a000000, 0x00000200 },
+    [VIRT_CPLD] =               { 0x0b000000, 0x00000800 },
     /* ...repeating for a total of NUM_VIRTIO_TRANSPORTS, each of that size */
     [VIRT_PLATFORM_BUS] =       { 0x0c000000, 0x02000000 },
     [VIRT_SECURE_MEM] =         { 0x0e000000, 0x01000000 },
@@ -1072,6 +1073,28 @@ static void create_virtio_devices(const VirtMachineState *vms)
     }
 }
 
+static void create_virt_cpld_device(const VirtMachineState *vms)
+{
+    hwaddr base = vms->memmap[VIRT_CPLD].base;
+    hwaddr size = vms->memmap[VIRT_CPLD].size;
+    MachineState *ms = MACHINE(vms);
+    char *nodename;
+
+    /*
+     * virt-cpld@0b000000 {
+     *         compatible = "virt-cpld";
+     *         reg = <0x0b000000 0x800>;
+     * }
+     */
+
+    sysbus_create_simple("virt-cpld", base, NULL);
+
+    nodename = g_strdup_printf("/virt_cpld@%" PRIx64, base);
+    qemu_fdt_add_subnode(ms->fdt, nodename);
+    qemu_fdt_setprop_string(ms->fdt, nodename, "compatible", "virt-cpld");
+    qemu_fdt_setprop_sized_cells(ms->fdt, nodename, "reg", 2, base, 2, size);
+    g_free(nodename);
+}
 #define VIRT_FLASH_SECTOR_SIZE (256 * KiB)
 
 static PFlashCFI01 *virt_flash_create1(VirtMachineState *vms,
@@ -2219,6 +2242,7 @@ static void machvirt_init(MachineState *machine)
      * no backend is created the transport will just sit harmlessly idle.
      */
     create_virtio_devices(vms);
+    create_virt_cpld_device(vms);
 
     vms->fw_cfg = create_fw_cfg(vms, &address_space_memory);
     rom_set_fw(vms->fw_cfg);
